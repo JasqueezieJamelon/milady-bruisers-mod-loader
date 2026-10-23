@@ -26,7 +26,13 @@ and **Restore original game**.
 
 **Mods that use their own installer** (for example The Undercard): install those first. The loader
 treats whatever is in `data.win` as the base and adds its mods on top. The launcher lists it as
-"installed separately". If that other installer runs again later, just press PLAY in the loader afterwards.
+"installed separately".
+
+**Updating The Undercard** (or another installer-based mod): close the game, press *Restore original game*
+in the launcher, run that mod's installer, then press PLAY. Restore first gives the installer back the exact
+file it made, otherwise it refuses to update because it sees the loader's mods in `data.win`. The launcher
+then says what changed (for example "The Undercard was updated from 2026.10.23.8 to 2026.10.23.25") and
+puts your loader mods back on top.
 
 **Uninstalling:** press *Restore original game* in the launcher, or use Steam's *Verify integrity of game files*.
 
