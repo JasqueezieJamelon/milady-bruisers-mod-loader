@@ -30,8 +30,6 @@ treats whatever is in `data.win` as the base and adds its mods on top. The launc
 
 **Uninstalling:** press *Restore original game* in the launcher, or use Steam's *Verify integrity of game files*.
 
-Every push is built automatically by GitHub Actions; tagged versions (`v0.1.0`, …) become Releases.
-
 ## License
 
 GPL-3.0 - see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md). Not affiliated with the developers of
