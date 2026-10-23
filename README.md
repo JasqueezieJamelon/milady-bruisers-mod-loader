@@ -17,24 +17,12 @@ rebuilds it with every mod you've switched on, in an order you control, and tell
 5. Double-click `MiladyLoader.exe`. The launcher window lists your mods - tick them on or off, change
    the order, then press **PLAY**.
 
-PLAY only rebuilds the game file when something changed (a mod added, removed, switched, reordered or
+"Play" only rebuilds the game file when something changed (a mod added, removed, switched, reordered or
 updated, or the game itself updated), then starts the game through Steam. You can launch the game from
 the loader every time, or from Steam as usual - the mods stay in until you change something.
 
 The window also has **Play without mods** (one session with the plain game), **Open mods folder**,
 and **Restore original game**.
-
-Advanced: the same things work from a terminal.
-
-| Command | What it does |
-|---|---|
-| `MiladyLoader play` | Rebuild if needed, then start the game |
-| `MiladyLoader build` | Rebuild the game with all switched-on mods |
-| `MiladyLoader check` | Show the load order and any conflicts without changing anything |
-| `MiladyLoader list` | List installed mods |
-| `MiladyLoader enable <id>` / `disable <id>` | Switch a mod on or off |
-| `MiladyLoader move <id> <n>` | Change load order (1 = applied first) |
-| `MiladyLoader restore` | Go back to the game without loader mods |
 
 **Mods that use their own installer** (for example The Undercard): install those first. The loader
 treats whatever is in `data.win` as the base and adds its mods on top. The launcher lists it as
