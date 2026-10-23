@@ -1,0 +1,14 @@
+{
+  "id": "bruisers-optimized-mod",
+  "name": "BruisersOptimizedMod",
+  "version": "0.4.0",
+  "author": "JasqueezieJamelon",
+  "description": "Ate/Trained Today box on the career screen, saves after eating/training, and a Meal Optimizer (Nutrients / Best Value / Cheapest) on the Meal Plan screen.",
+  "loaderVersion": "0.1",
+  "testedGameHashes": [ "35C10B8C95FF14CA8844FAEC5BF29300E566EA4D3F1124BE96AAA884F23612B2" ],
+  "patches": [
+    { "target": "gml_Object_oCareer_Step_1",  "mode": "append", "file": "code/career_begin_step.gml" },
+    { "target": "gml_Object_oCareer_Step_2",  "mode": "append", "file": "code/career_end_step.gml" },
+    { "target": "gml_Object_oCareer_Draw_75", "mode": "append", "file": "code/career_draw_gui_end.gml" }
+  ]
+}

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Lets the project build on Linux/macOS too (CI and contributors); the program itself runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationIcon>..\..\assets\milady.ico</ApplicationIcon>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MiladyLoader</AssemblyName>
+    <RootNamespace>MiladyLoader</RootNamespace>
+    <Version>0.2.0</Version>
+    <Product>Milady Bruisers Mod Loader</Product>
+    <Copyright>GPL-3.0-or-later</Copyright>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- No WinForms designer is used; controls are built in code. -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\logo.png" LogicalName="MiladyLoader.logo.png" />
+    <EmbeddedResource Include="..\..\assets\milady.ico" LogicalName="MiladyLoader.milady.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- UndertaleModTool's library (GPLv3), pinned to release 0.9.2.0 as a git submodule. -->
+    <ProjectReference Include="..\..\external\UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj" />
+  </ItemGroup>
+
+</Project>

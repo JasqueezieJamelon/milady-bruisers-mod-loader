@@ -1,0 +1,17 @@
+{
+  // A tiny example mod: shows "Milady Loader active" in the corner of the Career Management screen.
+  // Copy this folder into MiladyLoader/mods/ and run the loader to try it.
+  "id": "hello-milady",
+  "name": "Hello Milady",
+  "version": "1.0.0",
+  "author": "Milady Bruisers Mod Loader",
+  "description": "Example mod: proves the loader works by drawing a small label on the career screen.",
+  "loaderVersion": "0.1",
+  "patches": [
+    {
+      "target": "gml_Object_oCareer_Draw_64",
+      "mode": "append",
+      "file": "code/career_draw_gui.gml"
+    }
+  ]
+}

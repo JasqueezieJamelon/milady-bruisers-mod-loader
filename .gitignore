@@ -1,0 +1,7 @@
+bin/
+obj/
+package/
+*.user
+.vs/
+*.win
+*.milady-tmp
