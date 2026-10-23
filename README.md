@@ -7,10 +7,6 @@ can't both be installed. Milady mods are different: each mod is a folder of **in
 code after the career screen's update event"). The loader keeps an untouched copy of your game file and
 rebuilds it with every mod you've switched on, in an order you control, and tells you if two mods clash.
 
-> Status: **early (0.2)**. The core works - launcher window, backup, load order, rebuilding, conflict report.
-> When the loader is active, the main menu shows "MILADY LOADER <version> - <n> MODS" next to the game version.
-> The shared hook system that makes mods even more compatible is next (see [docs/DESIGN.md](docs/DESIGN.md)).
-
 ## For players
 
 1. Download the latest `MiladyLoader-….zip` from [Releases](../../releases) (or the latest build under
@@ -45,15 +41,6 @@ treats whatever is in `data.win` as the base and adds its mods on top. The launc
 "installed separately". If that other installer runs again later, just press PLAY in the loader afterwards.
 
 **Uninstalling:** press *Restore original game* in the launcher, or use Steam's *Verify integrity of game files*.
-
-## Building from source
-
-The loader is C# (.NET 10) and uses UndertaleModTool's library, included as a git submodule.
-
-```
-git clone --recursive https://github.com/JasqueezieJamelon/milady-bruisers-mod-loader
-dotnet publish src/MiladyLoader/MiladyLoader.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-```
 
 Every push is built automatically by GitHub Actions; tagged versions (`v0.1.0`, …) become Releases.
 
