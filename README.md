@@ -32,7 +32,6 @@ Advanced: the same things work from a terminal.
 
 | Command | What it does |
 |---|---|
-| `MiladyLoader` (double-click) | Open the launcher window |
 | `MiladyLoader play` | Rebuild if needed, then start the game |
 | `MiladyLoader build` | Rebuild the game with all switched-on mods |
 | `MiladyLoader check` | Show the load order and any conflicts without changing anything |
