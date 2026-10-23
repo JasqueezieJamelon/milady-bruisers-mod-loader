@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -18,6 +19,12 @@ public sealed class LoaderState
 
     /// <summary>Fingerprint of everything that went into the last build (see Builder.Fingerprint).</summary>
     [JsonPropertyName("lastBuiltFingerprint")] public string LastBuiltFingerprint { get; set; } = "";
+
+    /// <summary>
+    /// Mods installed with their own installers that are part of the base, as "Name@Version", so the loader can
+    /// say what changed when the base is replaced. Null in state files written before this was added.
+    /// </summary>
+    [JsonPropertyName("baseExternalMods")] public List<string>? BaseExternalMods { get; set; }
 }
 
 /// <summary>One line of MiladyLoader/loadorder.json.</summary>
@@ -136,6 +143,36 @@ public sealed class Workspace
             hash = Convert.ToHexString(SHA256.HashData(fs));
         lock (HashCache) HashCache[fi.FullName] = (fi.Length, fi.LastWriteTimeUtc, hash);
         return hash;
+    }
+
+    static readonly Dictionary<(string path, string text), (long len, DateTime time, bool found)> TextCache = new();
+
+    /// <summary>True if the file contains the given text anywhere. Remembered like Sha256.</summary>
+    public static bool ContainsText(string path, string text)
+    {
+        var fi = new FileInfo(Path.GetFullPath(path));
+        var key = (fi.FullName.ToUpperInvariant(), text);
+        lock (TextCache)
+            if (TextCache.TryGetValue(key, out var c) && c.len == fi.Length && c.time == fi.LastWriteTimeUtc) return c.found;
+
+        // Read in 1 MB chunks, carrying the end of each chunk over so a match across two chunks isn't missed.
+        byte[] needle = Encoding.UTF8.GetBytes(text);
+        byte[] buf = new byte[1 << 20];
+        int carry = 0;
+        bool found = false;
+        using (var fs = File.OpenRead(fi.FullName))
+        {
+            int n;
+            while (!found && (n = fs.Read(buf, carry, buf.Length - carry)) > 0)
+            {
+                int len = carry + n;
+                found = buf.AsSpan(0, len).IndexOf(needle) >= 0;
+                carry = Math.Min(needle.Length - 1, len);
+                Buffer.BlockCopy(buf, len - carry, buf, 0, carry);
+            }
+        }
+        lock (TextCache) TextCache[key] = (fi.Length, fi.LastWriteTimeUtc, found);
+        return found;
     }
 
     public static bool GameIsRunning() =>

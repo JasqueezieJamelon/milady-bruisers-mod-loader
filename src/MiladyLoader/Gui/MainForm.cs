@@ -252,6 +252,7 @@ sealed class MainForm : Form
             var found = builder.Discover(new Report());
             var order = ws.LoadOrder();
             var external = builder.DescribeBase(builder.ProspectiveBaseHash(), r);
+            if (builder.AdoptionProblem() is string problem) r.Errors.Add(problem);
             builder.Analyze(mods, r);
             needs = builder.NeedsBuild(out reason);
 

@@ -40,37 +40,118 @@ public sealed class Builder(Workspace ws)
     /// Makes sure backup/base.win holds the game file the loader should build on.
     /// If data.win was changed by something other than the loader (Steam update, another mod's
     /// installer), that new file becomes the base, so non-loader mods are kept underneath loader mods.
+    /// A changed data.win that already has loader mods in it is never used (see AdoptionProblem); when
+    /// restoring, the saved base is put back instead.
     /// </summary>
-    public LoaderState SyncBase(Report r)
+    public LoaderState SyncBase(Report r, bool restoring = false)
     {
         var state = ws.LoadState();
         string cur = Workspace.Sha256(ws.DataWin);
+        bool firstRun = !File.Exists(ws.BaseWin) || string.IsNullOrEmpty(state.BaseHash);
+        bool adopted = false;
 
-        if (!File.Exists(ws.BaseWin) || string.IsNullOrEmpty(state.BaseHash))
+        // State files from before baseExternalMods existed: record it now, before a restore clears lastBuiltMods.
+        if (!firstRun) state.BaseExternalMods ??= BaseExternalIds(state);
+
+        if (AdoptionProblem(state, cur) is string problem)
+        {
+            if (!restoring || firstRun) throw new LoaderException(problem);
+            r.Warnings.Add("data.win was changed by something other than the loader, but it already had loader mods inside it, " +
+                           "so it was ignored and the last clean base was put back.");
+        }
+        else if (firstRun)
         {
             File.Copy(ws.DataWin, ws.BaseWin, true);
             state.BaseHash = cur;
             state.LastBuiltHash = "";
+            state.BaseExternalMods = ExternalIds(cur);
+            adopted = true;
             r.Info.Add("First run: saved your current game file as the base to build on (MiladyLoader/backup/base.win).");
         }
         else if (cur != state.BaseHash && cur != state.LastBuiltHash)
         {
+            var changes = ExternalChanges(state, cur);
             string prev = Path.Combine(ws.BackupDir, "base-previous.win");
             File.Copy(ws.BaseWin, prev, true);
             File.Copy(ws.DataWin, ws.BaseWin, true);
             state.BaseHash = cur;
             state.LastBuiltHash = "";
-            r.Warnings.Add("data.win changed since the loader last touched it (a game update, Steam file verification, " +
-                           "or another mod's own installer). Using it as the new base. The old base was kept as backup/base-previous.win.");
+            state.BaseExternalMods = ExternalIds(cur);
+            adopted = true;
+            if (changes.Count == 0)
+                r.Warnings.Add("data.win changed since the loader last touched it (a game update, Steam file verification, " +
+                               "or another mod's own installer). Using it as the new base. The old base was kept as backup/base-previous.win.");
+            else
+            {
+                foreach (var (text, removed) in changes) (removed ? r.Warnings : r.Info).Add(text + ".");
+                r.Info.Add("Your loader mods are added on top of the new game file. The previous one was kept as backup/base-previous.win.");
+            }
         }
-        else if (Workspace.Sha256(ws.BaseWin) != state.BaseHash)
-        {
+
+        if (!adopted && Workspace.Sha256(ws.BaseWin) != state.BaseHash)
             throw new LoaderException("backup/base.win doesn't match what the loader saved earlier. Use Steam's " +
                                       "\"Verify integrity of game files\", then run the loader again to start fresh.");
-        }
 
         ws.SaveState(state);
         return state;
+    }
+
+    /// <summary>
+    /// Explains the problem when the file the loader would take as its new base already has loader mods in it -
+    /// for example another mod's installer patched the loader's build instead of a clean game file. Building on
+    /// that would add every loader mod a second time. Null when there's no problem.
+    /// </summary>
+    public string? AdoptionProblem() => AdoptionProblem(ws.LoadState(), Workspace.Sha256(ws.DataWin));
+
+    string? AdoptionProblem(LoaderState state, string cur)
+    {
+        bool firstRun = !File.Exists(ws.BaseWin) || string.IsNullOrEmpty(state.BaseHash);
+        bool willAdopt = firstRun || (cur != state.BaseHash && cur != state.LastBuiltHash);
+        if (!willAdopt || !Workspace.ContainsText(ws.DataWin, LoaderInfo.MenuLabelPrefix)) return null;
+        return firstRun
+            ? "Your game file already has loader mods inside it, but the loader has no clean copy saved to build on. " +
+              "Building on it would add your mods twice, so the loader won't use it. To fix it: use Steam's \"Verify integrity " +
+              "of game files\", reinstall any mods that have their own installer (like The Undercard), then press PLAY."
+            : "data.win was changed by something other than the loader (probably a mod's own installer, like The Undercard), " +
+              "but the new file already has loader mods inside it. Building on it would add your mods twice, so the loader won't use it. " +
+              "To fix it: press Restore, run the other mod's installer again, then press PLAY.";
+    }
+
+    /// <summary>Mods installed with their own installers that are part of the given file, as "Name@Version".</summary>
+    List<string> ExternalIds(string hash) => ExternalMods.Detect(ws, hash).Select(x => $"{x.Name}@{x.Version}").ToList();
+
+    /// <summary>
+    /// The mods with their own installers in the saved base. Older state files don't record it, so fall back
+    /// to the last build's list, then to detecting them in the base (only works until their installer runs again).
+    /// </summary>
+    List<string> BaseExternalIds(LoaderState state)
+    {
+        if (state.BaseExternalMods != null) return state.BaseExternalMods;
+        var fromBuild = state.LastBuiltMods.Where(s => s.StartsWith("external:")).Select(s => s["external:".Length..]).ToList();
+        return fromBuild.Count > 0 ? fromBuild : ExternalIds(state.BaseHash);
+    }
+
+    /// <summary>
+    /// How the mods installed with their own installers differ between the saved base and data.win, in plain
+    /// words (e.g. "The Undercard was updated from A to B"). Removed = that mod is gone. Empty when neither has any.
+    /// </summary>
+    List<(string Text, bool Removed)> ExternalChanges(LoaderState state, string cur)
+    {
+        var before = BaseExternalIds(state)
+                     .Select(s => s.LastIndexOf('@') is int at and >= 0 ? (Name: s[..at], Version: s[(at + 1)..]) : (Name: s, Version: "?"))
+                     .ToList();
+        var after = ExternalMods.Detect(ws, cur);
+        var changes = new List<(string, bool)>();
+        foreach (var x in after)
+        {
+            var old = before.FirstOrDefault(b => b.Name == x.Name);
+            changes.Add((old.Name == null ? $"{x.Name} {x.Version} was installed"
+                       : old.Version != x.Version ? $"{x.Name} was updated from {old.Version} to {x.Version}"
+                       : $"{x.Name} {x.Version} was reinstalled", false));
+        }
+        foreach (var b in before.Where(b => after.All(x => x.Name != b.Name)))
+            changes.Add(($"{b.Name} is no longer part of the game file (a game update, a Steam file check, or it was uninstalled)", true));
+        return changes;
     }
 
     /// <summary>Finds installed mods and returns the enabled ones in final load order.</summary>
@@ -279,8 +360,13 @@ public sealed class Builder(Workspace ws)
     {
         var state = ws.LoadState();
         if (string.IsNullOrEmpty(state.BaseHash) || !File.Exists(ws.BaseWin)) { reason = "first run"; return true; }
-        if (string.IsNullOrEmpty(state.LastBuiltHash) || Workspace.Sha256(ws.DataWin) != state.LastBuiltHash)
-        { reason = "the game file isn't the loader's last build"; return true; }
+        string cur = Workspace.Sha256(ws.DataWin);
+        if (string.IsNullOrEmpty(state.LastBuiltHash) || cur != state.LastBuiltHash)
+        {
+            var changes = cur != state.BaseHash ? ExternalChanges(state, cur) : new();
+            reason = changes.Count > 0 ? string.Join("; ", changes.Select(c => c.Text)) : "the game file isn't the loader's last build";
+            return true;
+        }
         var mods = ResolveMods(new Report(), persist: false);
         if (Fingerprint(state.BaseHash, mods) != state.LastBuiltFingerprint) { reason = "mods changed"; return true; }
         reason = "up to date";
@@ -331,7 +417,7 @@ public sealed class Builder(Workspace ws)
         // recompiling the game's own (large) menu draw code. Other mods appending here is fine too.
         const string target = "gml_Object_oMenu_Draw_73";
         if (data.GameObjects.ByName("oMenu") == null) throw new LoaderException("main menu object not found");
-        string label = $"MILADY LOADER {LoaderInfo.Version} - {modCount} MOD{(modCount == 1 ? "" : "S")}";
+        string label = $"{LoaderInfo.MenuLabelPrefix}{LoaderInfo.Version} -{modCount} MOD{(modCount == 1 ? "" : "S")}";
         string gml = $$"""
             {{LoaderInfo.BeginMarker("milady-loader")}}
             if (state == "menu" && hideMenu != 1)
@@ -366,7 +452,7 @@ public sealed class Builder(Workspace ws)
     {
         if (Workspace.GameIsRunning())
             throw new LoaderException("Bruisers 2D Boxing is running. Close the game, then run the loader again.");
-        var state = SyncBase(r);
+        var state = SyncBase(r, restoring: true);
         File.Copy(ws.BaseWin, ws.DataWin, true);
         state.LastBuiltHash = "";
         state.LastBuiltMods.Clear();

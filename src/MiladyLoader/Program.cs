@@ -112,6 +112,7 @@ public static class Program
                 var mods = builder.ResolveMods(r, persist: false);
                 var st = ws.LoadState();
                 if (!string.IsNullOrEmpty(st.BaseHash)) builder.DescribeBase(st.BaseHash, r);
+                if (builder.AdoptionProblem() is string problem) r.Errors.Add(problem);
                 builder.Analyze(mods, r);
                 r.Info.Insert(0, "Load order: " + (mods.Count == 0 ? "(no mods switched on)" : string.Join(" > ", mods.Select(m => $"{m.Name} {m.Version}"))));
                 Finish(ws, r, save: false);
