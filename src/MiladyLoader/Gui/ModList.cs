@@ -99,15 +99,17 @@ sealed class ModList : ListBox
         if (!string.IsNullOrEmpty(row.Version))
             TextRenderer.DrawText(g, "v" + row.Version, Theme.Small, new Point(vx, line1 + Px(2)), Theme.Muted, TextFormatFlags.NoPadding);
 
-        string sub = row.IsExternal ? "Installed separately - loader mods go on top of it"
+        bool missing = row.IsExternal && row.External!.Missing;
+        string sub = missing ? "Removed by a game update - run its installer again"
+                   : row.IsExternal ? "Installed separately - loader mods go on top of it"
                    : (string.IsNullOrWhiteSpace(row.Mod!.Author) ? "" : "by " + row.Mod.Author) + (row.Enabled ? "" : (string.IsNullOrWhiteSpace(row.Mod.Author) ? "" : "  ·  ") + "off");
-        TextRenderer.DrawText(g, sub, Theme.Small, new Rectangle(textX, line1 + Px(20), rightEdge - textX, Px(16)),
-            Theme.Muted, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, sub, Theme.Small, new Rectangle(textX, line1 + Px(20), rightEdge - textX - Px(70), Px(16)),
+            missing ? Theme.Warn : Theme.Muted, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
 
-        string tag = row.IsExternal ? "BASE" : "#" + row.Position;
+        string tag = missing ? "MISSING" : row.IsExternal ? "BASE" : "#" + row.Position;
         var tagSize = TextRenderer.MeasureText(g, tag, Theme.Section, Size.Empty, TextFormatFlags.NoPadding);
         TextRenderer.DrawText(g, tag, Theme.Section, new Point(rightEdge - tagSize.Width, b.Y + (b.Height - tagSize.Height) / 2),
-            row.IsExternal ? Theme.Muted : (row.Enabled ? Theme.Pink : Theme.Muted), TextFormatFlags.NoPadding);
+            missing ? Theme.Warn : row.IsExternal ? Theme.Muted : (row.Enabled ? Theme.Pink : Theme.Muted), TextFormatFlags.NoPadding);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)

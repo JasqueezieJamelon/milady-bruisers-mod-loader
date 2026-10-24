@@ -25,6 +25,9 @@ public sealed class LoaderState
     /// say what changed when the base is replaced. Null in state files written before this was added.
     /// </summary>
     [JsonPropertyName("baseExternalMods")] public List<string>? BaseExternalMods { get; set; }
+
+    /// <summary>Steam build id when the base came straight from Steam (a game update or file check), otherwise null.</summary>
+    [JsonPropertyName("baseSteamBuild")] public string? BaseSteamBuild { get; set; }
 }
 
 /// <summary>One line of MiladyLoader/loadorder.json.</summary>

@@ -26,6 +26,7 @@ static class Theme
     public static readonly Font Body = new(FontName, 9.75f);
     public static readonly Font BodyBold = new(FontName, 9.75f, FontStyle.Bold);
     public static readonly Font Small = new(FontName, 8.5f);
+    public static readonly Font Heading = new(FontName, 12f, FontStyle.Bold);
     public static readonly Font Section = new(FontName, 8.25f, FontStyle.Bold);
     public static readonly Font Title = new(FontName, 15f, FontStyle.Bold);
     public static readonly Font Play = new(FontName, 14f, FontStyle.Bold);

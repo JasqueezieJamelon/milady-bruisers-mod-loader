@@ -65,6 +65,7 @@ public sealed class Builder(Workspace ws)
             state.BaseHash = cur;
             state.LastBuiltHash = "";
             state.BaseExternalMods = ExternalIds(cur);
+            state.BaseSteamBuild = SteamWroteDataWin();
             adopted = true;
             r.Info.Add("First run: saved your current game file as the base to build on (MiladyLoader/backup/base.win).");
         }
@@ -77,6 +78,7 @@ public sealed class Builder(Workspace ws)
             state.BaseHash = cur;
             state.LastBuiltHash = "";
             state.BaseExternalMods = ExternalIds(cur);
+            state.BaseSteamBuild = SteamWroteDataWin();
             adopted = true;
             if (changes.Count == 0)
                 r.Warnings.Add("data.win changed since the loader last touched it (a game update, Steam file verification, " +
@@ -141,6 +143,7 @@ public sealed class Builder(Workspace ws)
                      .Select(s => s.LastIndexOf('@') is int at and >= 0 ? (Name: s[..at], Version: s[(at + 1)..]) : (Name: s, Version: "?"))
                      .ToList();
         var after = ExternalMods.Detect(ws, cur);
+        string? steam = SteamBuildOf(cur);
         var changes = new List<(string, bool)>();
         foreach (var x in after)
         {
@@ -149,9 +152,33 @@ public sealed class Builder(Workspace ws)
                        : old.Version != x.Version ? $"{x.Name} was updated from {old.Version} to {x.Version}"
                        : $"{x.Name} {x.Version} was reinstalled", false));
         }
-        foreach (var b in before.Where(b => after.All(x => x.Name != b.Name)))
-            changes.Add(($"{b.Name} is no longer part of the game file (a game update, a Steam file check, or it was uninstalled)", true));
+        var removed = before.Where(b => after.All(x => x.Name != b.Name)).Select(b => b.Name).ToList();
+        if (removed.Count > 0)
+            changes.Add((steam != null
+                ? $"Steam updated the game (build {steam}), which removed {string.Join(" and ", removed)}"
+                : $"{string.Join(" and ", removed)} is no longer part of the game file (a game update, a Steam file check, or it was uninstalled)", true));
+        else if (steam != null)
+            changes.Insert(0, ($"Steam updated the game (build {steam})", false));
         return changes;
+    }
+
+    /// <summary>
+    /// The Steam build id if Steam itself wrote data.win (a game update or file check) - the file was written
+    /// within a few minutes of Steam's last update of the game - otherwise null.
+    /// </summary>
+    string? SteamWroteDataWin()
+    {
+        var steam = GameLauncher.FindSteamUpdate(ws);
+        if (steam == null) return null;
+        return Math.Abs((File.GetLastWriteTime(ws.DataWin) - steam.Value.Updated).TotalMinutes) <= 10 ? steam.Value.Build : null;
+    }
+
+    /// <summary>The Steam build id if the given game file came straight from Steam, otherwise null.</summary>
+    string? SteamBuildOf(string hash)
+    {
+        if (hash == Workspace.Sha256(ws.DataWin) && SteamWroteDataWin() is string build) return build;
+        var state = ws.LoadState();
+        return hash == state.BaseHash ? state.BaseSteamBuild : null;
     }
 
     /// <summary>Finds installed mods and returns the enabled ones in final load order.</summary>
@@ -374,16 +401,26 @@ public sealed class Builder(Workspace ws)
     }
 
     /// <summary>Reports mods that are already part of the base file (installed with their own installers).</summary>
-    public List<ExternalMod> DescribeBase(string baseHash, Report r)
+    public List<ExternalMod> DescribeBase(string baseHash, Report r, bool warnMissing = true)
     {
         var external = ExternalMods.Detect(ws, baseHash);
         foreach (var x in external)
             r.Info.Add($"Installed separately: {x.Name} {x.Version}" + (x.Parts.Count > 0 ? $" ({x.Parts.Count} parts: {string.Join(", ", x.Parts)})" : "") +
                        ". Loader mods are added on top of it.");
+        foreach (var x in warnMissing ? ExternalMods.DetectMissing(ws, baseHash) : new())
+            r.Warnings.Add($"{x.Name} {x.Version} isn't in your game file any more - " +
+                           (SteamBuildOf(baseHash) != null ? "Steam's game update replaced the file. " : "Steam replaced the file (usually a game update or a file check). ") +
+                           $"To get it back: close the game, run {x.Name}'s installer and click Install (if it offers an update, take it - " +
+                           "the new game version may need one), then press PLAY. Until then, PLAY starts the game without it.");
         if (external.Count == 0 && !ExternalMods.KnownVanillaHashes.Contains(baseHash))
-            r.Info.Add("Your base game file isn't a version the loader recognises - either a game update or a mod installed some other way. Loader mods are added on top of it.");
+            r.Info.Add(SteamBuildOf(baseHash) is string build
+                ? $"Your base game file is Steam's game build {build}. Loader mods are added on top of it."
+                : "Your base game file isn't a version the loader recognises - either a game update or a mod installed some other way. Loader mods are added on top of it.");
         return external;
     }
+
+    /// <summary>Mods whose installer says they're installed, but that aren't in the given base (see ExternalMod.Missing).</summary>
+    public List<ExternalMod> MissingExternal(string baseHash) => ExternalMods.DetectMissing(ws, baseHash);
 
     static void Apply(UndertaleData data, ModManifest m)
     {

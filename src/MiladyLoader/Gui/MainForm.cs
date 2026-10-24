@@ -251,7 +251,8 @@ sealed class MainForm : Form
             var mods = builder.ResolveMods(r, persist: true);
             var found = builder.Discover(new Report());
             var order = ws.LoadOrder();
-            var external = builder.DescribeBase(builder.ProspectiveBaseHash(), r);
+            string baseHash = builder.ProspectiveBaseHash();
+            var external = builder.DescribeBase(baseHash, r, warnMissing: false).Concat(builder.MissingExternal(baseHash)).ToList();
             if (builder.AdoptionProblem() is string problem) r.Errors.Add(problem);
             builder.Analyze(mods, r);
             needs = builder.NeedsBuild(out reason);
@@ -276,9 +277,10 @@ sealed class MainForm : Form
         ShowDetails();
         ShowCheck(r, needs, reason);
 
-        int on = rows.Count(x => x.Enabled && !x.IsExternal), ext = rows.Count(x => x.IsExternal);
+        int on = rows.Count(x => x.Enabled && !x.IsExternal), ext = rows.Count(x => x.IsExternal && !x.External!.Missing);
         SetStatus(rows.Count == 0 ? "No mods installed yet." : $"{on + ext} mod{(on + ext == 1 ? "" : "s")} will be loaded.",
                   rows.Count == 0 ? "Put a mod's folder in the mods folder, then come back to this window." :
+                  rows.Any(x => x.IsExternal && x.External!.Missing) ? "A mod needs reinstalling - see the build check." :
                   needs ? "PLAY rebuilds the game file first (takes a few seconds), then starts the game." : "Everything is up to date - PLAY starts the game right away.");
     }
 
@@ -293,7 +295,15 @@ sealed class MainForm : Form
             return;
         }
         detailName.Text = row.Name;
-        if (row.IsExternal)
+        if (row.IsExternal && row.External!.Missing)
+        {
+            detailMeta.Text = $"v{row.Version}  ·  needs reinstalling";
+            detailText.Text = $"Steam replaced the game file (usually a game update), which removed {row.Name}.\n\n" +
+                              $"To get it back: close the game, run {row.Name}'s installer and click Install. If it offers an " +
+                              "update, take it - the new game version may need one. Then press PLAY here.\n\n" +
+                              "Until then, PLAY starts the game without it.";
+        }
+        else if (row.IsExternal)
         {
             detailMeta.Text = $"v{row.Version}  ·  installed with its own installer";
             detailText.Text = "This mod is already part of your game file, so the loader builds on top of it. " +
@@ -320,21 +330,42 @@ sealed class MainForm : Form
         {
             check.SelectionStart = check.TextLength;
             check.SelectionColor = c;
-            check.SelectionFont = f ?? Theme.Small;
+            check.SelectionFont = f ?? Theme.Body;
             check.AppendText(text + "\n");
         }
+        void Gap() => Line("", Theme.Muted, Theme.Small);
 
-        if (r.Errors.Count > 0) Line($"{r.Errors.Count} problem{(r.Errors.Count == 1 ? "" : "s")} found", Theme.Bad, Theme.BodyBold);
-        else if (r.Conflicts.Count > 0) Line($"{r.Conflicts.Count} conflict{(r.Conflicts.Count == 1 ? "" : "s")} between mods", Theme.Conflict, Theme.BodyBold);
-        else if (needs) Line("Ready - PLAY will rebuild first", Theme.Good, Theme.BodyBold);
-        else Line("Ready - up to date", Theme.Good, Theme.BodyBold);
-        if (needs && r.Errors.Count == 0) Line($"Reason: {reason}.", Theme.Muted);
-        Line("", Theme.Muted);
-
-        foreach (var x in r.Errors) Line("✕  " + x, Theme.Bad);
-        foreach (var x in r.Conflicts) Line("!  " + x, Theme.Conflict);
-        foreach (var x in r.Warnings) Line("•  " + x, Theme.Warn);
-        foreach (var x in r.Info) Line("·  " + x, Theme.Muted);
+        // At a glance: one headline and a sentence or two. The full report is in logs/last-build.txt.
+        var missing = rows.Where(x => x.IsExternal && x.External!.Missing).Select(x => x.Name).ToList();
+        string names = string.Join(" and ", missing);
+        if (r.Errors.Count > 0)
+        {
+            Line("Can't build", Theme.Bad, Theme.Heading);
+            foreach (var x in r.Errors) { Gap(); Line(x, Theme.Text); }
+        }
+        else if (missing.Count > 0)
+        {
+            Line($"{names} need{(missing.Count == 1 ? "s" : "")} reinstalling", Theme.Warn, Theme.Heading);
+            Gap();
+            Line($"A Steam update removed {(missing.Count == 1 ? "it" : "them")} from the game.", Theme.Text);
+            Line($"Run {names}'s installer, click Install, then come back here.", Theme.Text);
+        }
+        else
+        {
+            Line("Ready to play", Theme.Good, Theme.Heading);
+            Gap();
+            if (!needs) Line("Everything is up to date.", Theme.Text);
+            else
+            {
+                Line("PLAY will rebuild first.", Theme.Text);
+                Line(char.ToUpper(reason[0]) + reason[1..] + ".", Theme.Muted);
+            }
+        }
+        if (r.Errors.Count == 0)
+        {
+            foreach (var x in r.Conflicts) { Gap(); Line(x, Theme.Conflict); }
+            foreach (var x in r.Warnings) { Gap(); Line(x, Theme.Warn); }
+        }
         check.SelectionStart = 0;
         check.ScrollToCaret();
     }
@@ -385,6 +416,16 @@ sealed class MainForm : Form
     async Task PlayAsync(bool withMods)
     {
         if (busy) return;
+        var missing = rows.Where(x => x.IsExternal && x.External!.Missing).Select(x => x.Name).ToList();
+        if (withMods && missing.Count > 0)
+        {
+            string names = string.Join(" and ", missing);
+            var answer = MessageBox.Show(this,
+                $"{names} isn't in the game right now - a Steam update removed it.\n\n" +
+                $"Play without it anyway?\n\n(To get it back: run {names}'s installer and click Install.)",
+                "Play without " + names, MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (answer != DialogResult.Yes) return;
+        }
         holdStatus = false;
         SetBusy(true);
         Report? report = null;
