@@ -51,7 +51,7 @@ if (state == 21)
     {
         var _tgtOK = !(global.professionalStatus != 1 && global.hasOpponent == 0);
         var _modes = ["NUTRIENTS", "BEST VALUE", "CHEAPEST"];
-        var _desc = ["MOST NUTRIENTS, THEN CLOSEST TO GOAL WEIGHT", "NUTRIENTS + GOAL WEIGHT, CHEAPEST", "BEST PLAN YOU CAN AFFORD EVERY DAY UNTIL FIGHT NIGHT"];
+        var _desc = ["MOST NUTRIENTS, THEN CLOSEST TO GOAL WEIGHT", "NUTRIENTS + GOAL WEIGHT, CHEAPEST", "CLOSEST TO GOAL WEIGHT FOR THE LEAST CASH, EVERY DAY"];
         var _lines = [
             "MODE:  < " + _modes[global.bom_optMode] + " >",
             "GOAL WEIGHT:  < " + string(global.bom_goalW) + " >" + (_tgtOK && global.bom_goalW == global.weightToMake ? "  (TARGET)" : ((_tgtOK || global.bom_goalCustom) ? "  (CUSTOM)" : "  (NO FIGHT - NOT USED)")),

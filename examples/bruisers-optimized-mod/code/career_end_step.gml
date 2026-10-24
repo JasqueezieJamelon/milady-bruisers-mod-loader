@@ -142,27 +142,36 @@ if (state == 21 && variable_global_exists("mealDay") && variable_global_exists("
                     if (_better) _pick = _r;
                 }
             }
+            else if (global.bom_optMode == 2)
+            {
+                // CHEAPEST: weight first. Only plans you could afford every day until fight night
+                // (daily budget = cash / days left, today through Saturday; a full week if no fight is booked).
+                // Of those, get as close to the goal weight as possible, then pay the least for it.
+                // Nutrients only break ties between plans with the same weight and the same price.
+                _days = _hasT ? clamp(7 - global.activeDay, 1, 7) : 7;
+                var _budget = floor(_cash / _days);
+                var _dbest = 1000000;
+                for (var _i = 0; _i < _n; _i++) if (_rows[_i][2] <= _budget) _dbest = min(_dbest, _rows[_i][3]);
+                for (var _i = 0; _i < _n; _i++)
+                {
+                    var _r = _rows[_i];
+                    if (_r[2] > _budget || _r[3] > _dbest + _eps) continue;
+                    if (_pick == undefined || _r[2] < _pick[2] || (_r[2] == _pick[2] && _r[0] > _pick[0] + _eps)) _pick = _r;
+                }
+            }
             else
             {
                 // BEST VALUE: nutrients + closeness to goal weight, cheapest plan within 5% of the best.
-                // CHEAPEST: the same, but only plans you could afford every day until fight night:
-                // daily budget = cash / days left (today through Saturday; a full week if no fight is booked).
-                var _budget = _cash;
-                if (global.bom_optMode == 2)
-                {
-                    _days = _hasT ? clamp(7 - global.activeDay, 1, 7) : 7;
-                    _budget = floor(_cash / _days);
-                }
                 var _smax = 0;
                 for (var _i = 0; _i < _n; _i++)
                 {
                     _rows[_i][9] = (_nmax > 0 ? _rows[_i][0] / _nmax : 1) + 1 - min(_rows[_i][3], 10) / 10;
-                    if (_rows[_i][2] <= _budget && _rows[_i][9] > _smax) _smax = _rows[_i][9];
+                    if (_rows[_i][2] <= _cash && _rows[_i][9] > _smax) _smax = _rows[_i][9];
                 }
                 for (var _i = 0; _i < _n; _i++)
                 {
                     var _r = _rows[_i];
-                    if (_r[2] > _budget || _r[9] < _smax * 0.95) continue;
+                    if (_r[2] > _cash || _r[9] < _smax * 0.95) continue;
                     if (_pick == undefined || _r[2] < _pick[2] || (_r[2] == _pick[2] && _r[9] > _pick[9])) _pick = _r;
                 }
             }
