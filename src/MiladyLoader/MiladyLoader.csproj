@@ -11,7 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MiladyLoader</AssemblyName>
     <RootNamespace>MiladyLoader</RootNamespace>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <Product>Milady Bruisers Mod Loader</Product>
     <Copyright>GPL-3.0-or-later</Copyright>
     <InvariantGlobalization>true</InvariantGlobalization>
