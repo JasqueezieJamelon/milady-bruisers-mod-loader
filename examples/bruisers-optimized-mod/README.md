@@ -22,6 +22,9 @@ Copy this `bruisers-optimized-mod` folder into `MiladyLoader/mods/`, close the g
 ## Changelog
 
 ```
+v0.3.3
+- Fixed Trained Today not counting gym training that leaves the screen (sparring, speed bag, heavy bag, freestyle).
+
 v0.3.2
 - Now a Milady Bruisers Mod Loader mod (works alongside other loader mods).
 - Meal Optimizer: added Cheapest mode - gets as close to your goal weight as possible for the least

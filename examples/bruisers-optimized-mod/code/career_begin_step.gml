@@ -29,7 +29,8 @@ if (!variable_global_exists("bom_trainDay") || global.bom_trainDay != _dk)
     global.bom_trainCount = global.trainedToday ? 1 : 0;
 }
 
-global.bom_watch = (state == 4);
+// Not during a transition: the room can change before End Step runs, which would leave trainedToday cleared.
+global.bom_watch = (state == 4 && !instance_exists(oTransition));
 if (global.bom_watch)
 {
     global.bom_was = global.trainedToday;
