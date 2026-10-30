@@ -16,11 +16,11 @@ sealed class MainForm : Form
     bool holdStatus;
 
     readonly ModList list = new() { Dock = DockStyle.Fill };
-    readonly PillButton upButton = new() { Text = "Move up" };
-    readonly PillButton downButton = new() { Text = "Move down" };
+    readonly PillButton upButton = new() { Text = "▲" };
+    readonly PillButton downButton = new() { Text = "▼" };
     readonly PillButton restoreButton = new() { Text = "Restore original game" };
     readonly PillButton folderButton = new() { Text = "Open mods folder" };
-    readonly PillButton vanillaButton = new() { Text = "Play without mods" };
+    readonly PillButton refreshButton = new() { Text = "Refresh" };
     readonly PillButton playButton = new() { Text = "PLAY", Filled = true, Font = Theme.Play };
     readonly Label detailName = new() { AutoSize = true, Font = Theme.BodyBold, ForeColor = Theme.Text, Margin = new Padding(0) };
     readonly Label detailMeta = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted, Margin = new Padding(0, 2, 0, 6) };
@@ -57,9 +57,9 @@ sealed class MainForm : Form
         upButton.Click += (_, _) => MoveSelected(-1);
         downButton.Click += (_, _) => MoveSelected(+1);
         folderButton.Click += (_, _) => OpenFolder(ws.ModsDir);
+        refreshButton.Click += (_, _) => { if (!busy) { holdStatus = false; Reload(); } };
         restoreButton.Click += (_, _) => RestoreClicked();
-        vanillaButton.Click += async (_, _) => await PlayAsync(withMods: false);
-        playButton.Click += async (_, _) => await PlayAsync(withMods: true);
+        playButton.Click += async (_, _) => await PlayAsync();
         Activated += (_, _) => { if (!busy && !holdStatus) Reload(); };
         AcceptButton = playButton;
     }
@@ -101,7 +101,7 @@ sealed class MainForm : Form
         left.Controls.Add(title);
         left.Controls.Add(new Label
         {
-            Text = $"v{LoaderInfo.Version}   ·   {ws.GameDir}", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted,
+            Text = $"v{LoaderInfo.Version}", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted,
             Margin = new Padding(2, 2, 0, 0), AutoEllipsis = true,
         });
         left.Anchor = AnchorStyles.Left;
@@ -127,36 +127,37 @@ sealed class MainForm : Form
         left.Controls.Add(SectionTitle("MODS", "top of the list is applied first"), 0, 0);
         left.Controls.Add(Card(list, new Padding(0, 6, 0, 6)), 0, 1);
 
-        var buttons = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 4, RowCount = 1, Margin = new Padding(0, 10, 0, 0) };
+        var buttons = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 5, RowCount = 1, Margin = new Padding(0, 10, 0, 0) };
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        foreach (var b in new[] { upButton, downButton }) { b.Size = new Size(104, 32); b.Margin = new Padding(0, 0, 8, 0); }
+        foreach (var b in new[] { upButton, downButton }) { b.Size = new Size(44, 32); b.Margin = new Padding(0, 0, 8, 0); }
+        refreshButton.Size = new Size(90, 32);
+        refreshButton.Margin = new Padding(0, 0, 8, 0);
         restoreButton.Size = new Size(176, 32);
         restoreButton.Margin = new Padding(0);
         buttons.Controls.Add(upButton, 0, 0);
         buttons.Controls.Add(downButton, 1, 0);
-        buttons.Controls.Add(restoreButton, 3, 0);
+        buttons.Controls.Add(refreshButton, 2, 0);
+        buttons.Controls.Add(restoreButton, 4, 0);
         left.Controls.Add(buttons, 0, 2);
         t.Controls.Add(left, 0, 0);
 
         // Right: details of the selected mod, and the build check.
         var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = new Padding(10, 0, 0, 0) };
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        // Fixed split: the details take the space above a fixed-height build check, so selecting a mod moves nothing.
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
         right.Controls.Add(SectionTitle("DETAILS", null), 0, 0);
 
-        var details = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        var details = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Margin = new Padding(0) };
         details.Controls.AddRange(new Control[] { detailName, detailMeta, detailText });
         var detailCard = Card(details, new Padding(14, 12, 14, 12));
-        details.Dock = DockStyle.Top;
-        detailCard.AutoSize = true;
-        detailCard.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         detailCard.Margin = new Padding(0, 6, 0, 14);
-        detailCard.Dock = DockStyle.Top;
         detailCard.Resize += (_, _) =>
         {
             int w = Math.Max(100, detailCard.ClientSize.Width - detailCard.Padding.Horizontal);
@@ -172,9 +173,8 @@ sealed class MainForm : Form
 
     Control Footer()
     {
-        var t = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 16, 0, 0) };
+        var t = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 16, 0, 0) };
         t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         var s = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Left, Margin = new Padding(0) };
@@ -183,18 +183,14 @@ sealed class MainForm : Form
         t.Controls.Add(s, 0, 0);
         t.Resize += (_, _) =>
         {
-            int w = Math.Max(120, t.ClientSize.Width - 360);
+            int w = Math.Max(120, t.ClientSize.Width - 200);
             status.MaximumSize = statusSub.MaximumSize = new Size(w, 0);
         };
 
-        vanillaButton.Size = new Size(150, 48);
-        vanillaButton.Margin = new Padding(0, 0, 10, 0);
-        vanillaButton.Anchor = AnchorStyles.Right;
         playButton.Size = new Size(176, 48);
         playButton.Margin = new Padding(0);
         playButton.Anchor = AnchorStyles.Right;
-        t.Controls.Add(vanillaButton, 1, 0);
-        t.Controls.Add(playButton, 2, 0);
+        t.Controls.Add(playButton, 1, 0);
         return t;
     }
 
@@ -277,11 +273,7 @@ sealed class MainForm : Form
         ShowDetails();
         ShowCheck(r, needs, reason);
 
-        int on = rows.Count(x => x.Enabled && !x.IsExternal), ext = rows.Count(x => x.IsExternal && !x.External!.Missing);
-        SetStatus(rows.Count == 0 ? "No mods installed yet." : $"{on + ext} mod{(on + ext == 1 ? "" : "s")} will be loaded.",
-                  rows.Count == 0 ? "Put a mod's folder in the mods folder, then come back to this window." :
-                  rows.Any(x => x.IsExternal && x.External!.Missing) ? "A mod needs reinstalling - see the build check." :
-                  needs ? "PLAY rebuilds the game file first (takes a few seconds), then starts the game." : "Everything is up to date - PLAY starts the game right away.");
+        SetStatus(""); // blank unless an action (rebuild, restore, error) has something to say
     }
 
     void ShowDetails()
@@ -313,7 +305,7 @@ sealed class MainForm : Form
         else
         {
             var m = row.Mod!;
-            detailMeta.Text = string.Join("  ·  ", new[] { "v" + m.Version, string.IsNullOrWhiteSpace(m.Author) ? null : "by " + m.Author, row.Enabled ? "on" : "off" }
+            detailMeta.Text = string.Join("  ·  ", new[] { "v" + m.Version, string.IsNullOrWhiteSpace(m.Author) ? null : "by " + m.Author }
                                                    .Where(s => s != null));
             detailText.Text = (string.IsNullOrWhiteSpace(m.Description) ? "No description." : m.Description) +
                               $"\n\nFolder: mods\\{Path.GetFileName(m.Folder)}";
@@ -381,7 +373,7 @@ sealed class MainForm : Form
     void SetBusy(bool on)
     {
         busy = on;
-        foreach (var b in new Control[] { playButton, vanillaButton, restoreButton, list }) b.Enabled = !on;
+        foreach (var b in new Control[] { playButton, restoreButton, refreshButton, list }) b.Enabled = !on;
         UseWaitCursor = on;
         ShowDetails();
     }
@@ -413,11 +405,11 @@ sealed class MainForm : Form
         list.Focus();
     }
 
-    async Task PlayAsync(bool withMods)
+    async Task PlayAsync()
     {
         if (busy) return;
         var missing = rows.Where(x => x.IsExternal && x.External!.Missing).Select(x => x.Name).ToList();
-        if (withMods && missing.Count > 0)
+        if (missing.Count > 0)
         {
             string names = string.Join(" and ", missing);
             var answer = MessageBox.Show(this,
@@ -436,12 +428,7 @@ sealed class MainForm : Form
                 if (Workspace.GameIsRunning())
                     throw new LoaderException("The game is already running. Close it first, then press PLAY.");
                 report = new Report();
-                if (!withMods)
-                {
-                    SetStatus("Turning mods off for this session...");
-                    builder.Restore(report);
-                }
-                else if (builder.NeedsBuild(out _))
+                if (builder.NeedsBuild(out _))
                 {
                     SetStatus("Rebuilding the game file...", "This takes a few seconds.");
                     bool built = builder.Build(report, msg => SetStatus(msg, "This takes a few seconds."));
@@ -460,7 +447,7 @@ sealed class MainForm : Form
             }
 
             string how = GameLauncher.Launch(ws);
-            SetStatus(how, withMods ? "Have fun!" : "Mods are off this time. Press PLAY next time to turn them back on.", Theme.Good);
+            SetStatus(how, "Have fun!", Theme.Good);
             closing = true;
             await Task.Delay(1800);
             Close();

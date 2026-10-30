@@ -21,7 +21,7 @@ rebuilds it with every mod you've switched on, in an order you control, and tell
 updated, or the game itself updated), then starts the game through Steam. You can launch the game from
 the loader every time, or from Steam as usual - the mods stay in until you change something.
 
-The window also has **Play without mods** (one session with the plain game), **Open mods folder**,
+The window also has **Refresh** (picks up changes without reopening the window), **Open mods folder**,
 and **Restore original game**.
 
 **Mods that use their own installer** (for example The Undercard): install those first. The loader
