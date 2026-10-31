@@ -454,7 +454,7 @@ public sealed class Builder(Workspace ws)
         // recompiling the game's own (large) menu draw code. Other mods appending here is fine too.
         const string target = "gml_Object_oMenu_Draw_73";
         if (data.GameObjects.ByName("oMenu") == null) throw new LoaderException("main menu object not found");
-        string label = $"{LoaderInfo.MenuLabelPrefix}{LoaderInfo.Version} -{modCount} MOD{(modCount == 1 ? "" : "S")}";
+        string label = $"{LoaderInfo.MenuLabelPrefix}{LoaderInfo.Version} - {modCount} MOD{(modCount == 1 ? "" : "S")}";
         string gml = $$"""
             {{LoaderInfo.BeginMarker("milady-loader")}}
             if (state == "menu" && hideMenu != 1)
