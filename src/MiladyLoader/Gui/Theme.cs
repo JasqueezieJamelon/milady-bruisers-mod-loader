@@ -22,6 +22,11 @@ static class Theme
     public static readonly Color Conflict = Color.FromArgb(255, 140, 66);
     public static readonly Color Bad = Color.FromArgb(255, 95, 95);
 
+    /// <summary>The Windows display scale (1 = 100%, 2.5 = 250%). Fonts follow it on their own; pixel sizes use this.</summary>
+    public static readonly float Scale = ReadScale();
+    static float ReadScale() { using var g = Graphics.FromHwnd(IntPtr.Zero); return g.DpiX / 96f; }
+    public static int Dp(int v) => (int)Math.Round(v * Scale);
+
     public const string FontName = "Segoe UI";
     public static readonly Font Body = new(FontName, 9.75f);
     public static readonly Font BodyBold = new(FontName, 9.75f, FontStyle.Bold);
@@ -93,7 +98,7 @@ sealed class PillButton : Button
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Parent?.BackColor ?? Theme.Back);
         var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-        using var path = Theme.Rounded(r, Math.Min(10, Height / 2f - 1));
+        using var path = Theme.Rounded(r, Math.Min(Theme.Dp(10), Height / 2f - 1));
         Color text;
         if (Filled)
         {

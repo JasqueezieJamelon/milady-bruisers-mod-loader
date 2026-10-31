@@ -41,8 +41,7 @@ sealed class MainForm : Form
         builder = new Builder(ws);
 
         Text = LoaderInfo.Name;
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96, 96);
+        AutoScaleMode = AutoScaleMode.None; // scaled once below, so sizes can't be scaled twice
         ClientSize = new Size(880, 580);
         MinimumSize = new Size(896, 500);
         StartPosition = FormStartPosition.CenterScreen;
@@ -52,6 +51,8 @@ sealed class MainForm : Form
         try { Icon = Theme.AppIcon() ?? Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? Application.ExecutablePath); } catch { }
 
         Controls.Add(BuildLayout());
+        Scale(new SizeF(Theme.Scale, Theme.Scale));
+        FitToScreen();
 
         list.ToggleRequested += Toggle;
         list.SelectedIndexChanged += (_, _) => ShowDetails();
@@ -72,11 +73,25 @@ sealed class MainForm : Form
         Theme.DarkTitleBar(this);
     }
 
+    /// <summary>At high scaling on a small screen the window can be bigger than the screen: keep it on screen.</summary>
+    void FitToScreen()
+    {
+        var area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, Width, Height);
+        if (MinimumSize.Width > area.Width)
+        {
+            restoreButton.Text = "Restore";
+            restoreButton.Width = Theme.Dp(80);
+        }
+        MinimumSize = new Size(Math.Min(MinimumSize.Width, area.Width), Math.Min(MinimumSize.Height, area.Height));
+        Size = new Size(Math.Min(Width, area.Width), Math.Min(Height, area.Height));
+    }
+
     // ---------- layout ----------
 
     Control BuildLayout()
     {
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(20, 16, 20, 16) };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -120,9 +135,11 @@ sealed class MainForm : Form
         var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
         t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
         t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+        t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // Left: the mod list.
         var left = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = new Padding(0, 0, 10, 0) };
+        left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -150,6 +167,7 @@ sealed class MainForm : Form
 
         // Right: details of the selected mod, and the build check.
         var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = new Padding(10, 0, 0, 0) };
+        right.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         // Fixed split: the details take the space above a fixed-height build check, so selecting a mod moves nothing.
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -186,7 +204,7 @@ sealed class MainForm : Form
         t.Controls.Add(s, 0, 0);
         t.Resize += (_, _) =>
         {
-            int w = Math.Max(120, t.ClientSize.Width - 200);
+            int w = Math.Max(120, t.ClientSize.Width - Theme.Dp(200));
             status.MaximumSize = statusSub.MaximumSize = new Size(w, 0);
         };
 
@@ -228,7 +246,7 @@ sealed class MainForm : Form
             var g = e.Graphics;
             g.Clear(Parent?.BackColor ?? Theme.Back);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using var path = Theme.Rounded(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), LogicalToDeviceUnits(10));
+            using var path = Theme.Rounded(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(10));
             using var fill = new SolidBrush(Theme.Panel);
             using var pen = new Pen(Theme.Border, 1f);
             g.FillPath(fill, path);
@@ -549,7 +567,7 @@ sealed class MainForm : Form
     /// <summary>Finds the game (asking for the folder if needed) and runs the window.</summary>
     public static int Run(string? gameArg)
     {
-        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.SetHighDpiMode(HighDpiMode.SystemAware); // one scale for the whole session; Windows handles other monitors
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 

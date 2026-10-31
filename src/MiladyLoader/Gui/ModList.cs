@@ -33,10 +33,10 @@ sealed class ModList : ListBox
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        ItemHeight = LogicalToDeviceUnits(52);
+        ItemHeight = Theme.Dp(52);
     }
 
-    int Px(int v) => LogicalToDeviceUnits(v);
+    static int Px(int v) => Theme.Dp(v);
     Rectangle CheckRect(Rectangle row) => new(row.X + Px(14), row.Y + (row.Height - Px(20)) / 2, Px(20), Px(20));
 
     protected override void OnDrawItem(DrawItemEventArgs e)
