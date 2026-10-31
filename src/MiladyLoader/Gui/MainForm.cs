@@ -21,6 +21,7 @@ sealed class MainForm : Form
     readonly PillButton restoreButton = new() { Text = "Restore original game" };
     readonly PillButton folderButton = new() { Text = "Open mods folder" };
     readonly PillButton refreshButton = new() { Text = "Refresh" };
+    readonly PillButton rebuildButton = new() { Text = "Rebuild" };
     readonly PillButton playButton = new() { Text = "PLAY", Filled = true, Font = Theme.Play };
     readonly Label detailName = new() { AutoSize = true, Font = Theme.BodyBold, ForeColor = Theme.Text, Margin = new Padding(0) };
     readonly Label detailMeta = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted, Margin = new Padding(0, 2, 0, 6) };
@@ -43,7 +44,7 @@ sealed class MainForm : Form
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96, 96);
         ClientSize = new Size(880, 580);
-        MinimumSize = new Size(740, 500);
+        MinimumSize = new Size(896, 500);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Theme.Back;
         ForeColor = Theme.Text;
@@ -58,6 +59,7 @@ sealed class MainForm : Form
         downButton.Click += (_, _) => MoveSelected(+1);
         folderButton.Click += (_, _) => OpenFolder(ws.ModsDir);
         refreshButton.Click += (_, _) => { if (!busy) { holdStatus = false; Reload(); } };
+        rebuildButton.Click += async (_, _) => await RebuildAsync();
         restoreButton.Click += (_, _) => RestoreClicked();
         playButton.Click += async (_, _) => await PlayAsync();
         Activated += (_, _) => { if (!busy && !holdStatus) Reload(); };
@@ -127,21 +129,22 @@ sealed class MainForm : Form
         left.Controls.Add(SectionTitle("MODS", "top of the list is applied first"), 0, 0);
         left.Controls.Add(Card(list, new Padding(0, 6, 0, 6)), 0, 1);
 
-        var buttons = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 5, RowCount = 1, Margin = new Padding(0, 10, 0, 0) };
+        var buttons = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 6, RowCount = 1, Margin = new Padding(0, 10, 0, 0) };
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         foreach (var b in new[] { upButton, downButton }) { b.Size = new Size(44, 32); b.Margin = new Padding(0, 0, 8, 0); }
-        refreshButton.Size = new Size(90, 32);
-        refreshButton.Margin = new Padding(0, 0, 8, 0);
+        foreach (var b in new[] { refreshButton, rebuildButton }) { b.Size = new Size(80, 32); b.Margin = new Padding(0, 0, 8, 0); }
         restoreButton.Size = new Size(176, 32);
         restoreButton.Margin = new Padding(0);
         buttons.Controls.Add(upButton, 0, 0);
         buttons.Controls.Add(downButton, 1, 0);
         buttons.Controls.Add(refreshButton, 2, 0);
-        buttons.Controls.Add(restoreButton, 4, 0);
+        buttons.Controls.Add(rebuildButton, 3, 0);
+        buttons.Controls.Add(restoreButton, 5, 0);
         left.Controls.Add(buttons, 0, 2);
         t.Controls.Add(left, 0, 0);
 
@@ -373,7 +376,7 @@ sealed class MainForm : Form
     void SetBusy(bool on)
     {
         busy = on;
-        foreach (var b in new Control[] { playButton, restoreButton, refreshButton, list }) b.Enabled = !on;
+        foreach (var b in new Control[] { playButton, restoreButton, refreshButton, rebuildButton, list }) b.Enabled = !on;
         UseWaitCursor = on;
         ShowDetails();
     }
@@ -466,6 +469,51 @@ sealed class MainForm : Form
         finally
         {
             if (!closing) SetBusy(false);
+        }
+    }
+
+    /// <summary>Rebuilds the game file even if nothing changed, and leaves the game closed.</summary>
+    async Task RebuildAsync()
+    {
+        if (busy) return;
+        holdStatus = false;
+        SetBusy(true);
+        var report = new Report();
+        try
+        {
+            bool ok = await Task.Run(() =>
+            {
+                SetStatus("Rebuilding the game file...", "This takes a few seconds.");
+                bool built = builder.Build(report, msg => SetStatus(msg, "This takes a few seconds."));
+                File.WriteAllText(Path.Combine(ws.LogsDir, "last-build.txt"), report.Render());
+                return built;
+            });
+            if (ok)
+            {
+                Reload();
+                SetStatus("Rebuild finished.", "Press PLAY or start the game from Steam when you're ready.", Theme.Good);
+            }
+            else
+            {
+                ShowCheck(report, false, "");
+                SetStatus("Build failed - your game file wasn't changed.", "See the build check on the right for which mod failed.", Theme.Bad);
+            }
+            holdStatus = true;
+        }
+        catch (LoaderException e)
+        {
+            SetStatus(e.Message, "", Theme.Bad);
+            holdStatus = true;
+        }
+        catch (Exception e)
+        {
+            SetStatus("Something went wrong: " + e.Message, "Details were saved to MiladyLoader\\logs\\last-error.txt.", Theme.Bad);
+            holdStatus = true;
+            try { File.WriteAllText(Path.Combine(ws.LogsDir, "last-error.txt"), e.ToString()); } catch { }
+        }
+        finally
+        {
+            SetBusy(false);
         }
     }
 
